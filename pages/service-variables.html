@@ -1,0 +1,44 @@
+Configuring Variables for Services Deployed to Kubernetes — SBAB Docs  documentation SBAB Docs Ansible Controller Ansible Roles Ansible Vault Argo Workflows Authentication & Authorization Bitbucket Boost Chatbot Booli Ceph Dex Fortigate troubleshooting Generate certificate Go GitHub Copilot GitLab @Sbab User Guide GitLab Maintenance Grafana Istio Java Jenkins Jenkinsfile Jmeter Kafka Maintenance Kafka @Sbab User Guide Kafka Connect Kubectl Access Kubernetes Lab environment Local Open Web Metrics infrastructure MongoDB Netbox NVIDIA Neo4J Sonatype Nexus repository Oracle OWASP Database OWASP @Sbab User Guide Pact Principles of Security Prometheus ReactJS Redis Renovate S3 Security Guidelines for Developers Sentry Maintenance Sentry User Guide Configuring Variables for Services Deployed to Kubernetes Introduction HashiCorp Vault Pre-requisites Environment variables Custom Hashicorp Vault path for variables/files Secret files Service Repository env.list file Extra env vars Common variables Conclusion Software Architecture SonarQube Maintenance SonarQube User Guide Structurizr System Landscape Vagrant Zipkin Windows Pipelines SBAB Docs » Configuring Variables for Services Deployed to Kubernetes View page source Configuring Variables for Services Deployed to Kubernetes ï Introduction ï When deploying services to out Kubernetes cluster, itâs important to configure environment variables that are specific
+to each environment. This documentation describes the override structure for environment variables that will end up on
+the running pod in descending precedence. Tip When creating new services, itâs recommended to use a common variable that has already been defined, if one
+exists. If not, you can use HashiCorp Vault to store both secrets and other environment-specific values. Additionally, you can define insensitive environment-specific variables in the env.list file located in the
+service repository. Ansible Vault is considered a legacy solution that should not be used for new services. HashiCorp Vault ï The first source of environment variables is HashiCorp Vault. These variables have the highest precedence and will
+override any other variable with the same name. Pre-requisites ï Navigate to https://id.sbab.ad/ Request access to: PAM (CONTRIBUTOR) - K8S Environment variables ï Note The name of the environment variable is based on each key in the secret, in uppercase with underscores.
+If the key is foo-bar , the environment variable is renamed to FOO_BAR . Create/update a secret in the desired environment(s): Environment Path Sys test/k8s/sys/variables Acc test/k8s/acc/variables Stage test/k8s/stage/variables Prod prod/k8s/prod/variables Common common/k8s/common/variables The name of the secret should be equal to the name of the micro service Deploy the micro service Custom Hashicorp Vault path for variables/files ï Note This should only be used in cases where there is a legitmate reasoning behind it.
+An example of valid reasoning could for example be out of a security aspect where access to the variables/files should be limited in vault. Contact Tech-Security for approval of custom paths. The logic is the same as for the default vault paths. Variables & files needs to be split up into two different paths. These custom paths act as secondary paths to the default paths mentioned in the topic above,
+meaning it will fetch & combine variables or files from both the default & custom path if both vault paths contain anything and are defined hashicorp_k8s_custom_path_variables : "{{ hashicorp_base_path }}/data/.." hashicorp_k8s_custom_path_files : "{{ hashicorp_base_path }}/data/.." Define the two variables above with the custom paths above in a .yml file under k8s_service_deploy ansible role naming the .yml file to your service name (Replace - with _). Our ansible vault approle also needs to have read & list access to the path in question, Linux Team can help with this. Secret files ï Note Files are mounted from HashiCorp Vault into /etc/sbab/<service-name>/<key> . Create/update a secret in the desired environment(s): Environment Path Sys test/k8s/sys/files Acc test/k8s/acc/files Stage test/k8s/stage/files Prod prod/k8s/prod/files Common common/k8s/common/files The name of the secret should be equal to the name of the micro service Deploy the micro service through GitLab Service Repository env.list file ï The second source of environment variables is a subfolder structure in the service repository: config
+âââ sys
+â   âââ env.list
+âââ acc
+â   âââ env.list
+âââ stage
+â   âââ env.list
+âââ prod
+    âââ env.list Variables in the env.list file have the form VARIABLE_NAME=VARIABLE_VALUE and ansible syntax can be used to
+replace any variable value with an ansible variable, such as: LDAP_ADMIN_PASSWORD = {{ security_service_ldap_admin_password }} The following is an example of an env.list file from TNT spring-template service: # This is a comment ENV_VARIABLE_NAME = some_environment_specific_value DATASOURCE_USERNAME = SPRING_TEMPLATE_PROD DATASOURCE_PASSWORD = {{ spring_template_db_password }} When using Ansible, variables can be defined in multiple places, and the precedence of these variables can be important.
+You can find more information regarding Ansible Variable precedence here: https://docs.ansible.com/ansible/latest/user_guide/playbooks_variables.html#variable-precedence-where-should-i-put-a-variable Variables defined in higher-precedence locations will override variables defined in lower-precedence locations. The most common place to define an Ansible variable for a Kubernetes service is in the group_vars folder of in the
+Ansible inventories folder: ansible
+âââ inventories
+    âââ ossys
+    â   âââ group_vars
+    â       âââ all
+    â       âââ k8s
+    âââ osacc
+    â   âââ group_vars
+    â       âââ all
+    â       âââ k8s
+    âââ osstage
+    â   âââ group_vars
+    â       âââ all
+    â       âââ k8s
+    âââ osprod
+        âââ group_vars
+            âââ all
+            âââ k8s The variables defined in the all subfolder will be available for all services deployed to all environments
+(both Kubernetes and Legacy systems), while the k8s will only be available for services deployed to Kubernetes. Extra env vars ï The third source of environment variables is an Ansible role named k8s_service_deploy under the subfolder vars .
+The vars folder has in turn a service_name subfolder, where you place a YAML file with the same name as the service, but where all dashes have been replaced by
+underscores, for example spring_template.yml . The variables that should be available for all environments should
+then be defined under extra_env_vars , for example: --- extra_env_vars : HTTP_PROXY : "http://serverproxy.sbab.ad:8080" HTTPS_PROXY : "http://serverproxy.sbab.ad:8080" The HTTP_PROXY and HTTPS_PROXY variables will then be available for the spring-template service in all
+environments (sys, acc, stage and prod). Note Use this method only in special cases, for instance when the variable value to use is only available in Ansible. Common variables ï The fourth and final source of environment variables is common variables for all services located in k8s_service_deploy/browse/defaults/main.yml under secret_env and configmap_env . Here are some of the variables: Variable name Description ENV_NAME The name of the environment where the service is running: sys , acc , stage or prod SERVICE_NAME The name of the service ORACLE_SBAB_JDBCURL The JDBC URL for the Oracle database PARTNER_AUTH_PUBLIC_KEY_V2 The public JWT key for the partner auth service TZ Europe/Stockholm Tip Use the ENV_NAME variable to set the Spring profile with default value dev in the application.yml file: spring : profiles : include : ${ENV_NAME:dev} --- #dev profile spring : config : activate : on-profile : dev You can also use a separate application-dev.yml file for the dev profile. More information about profiles in Spring Boot can be found at docs.spring.io . Conclusion ï By following this override structure, you can ensure that environment variables are configured correctly for each
+environment when deploying services to our Kubernetes cluster. Warning You should not redefine variables described in this guide in the env.list file, since they are already
+available for use. For example: MICROSERVICES_JWT_KEY = {{ microservices_jwt_key }} PARTNER_AUTH_V2_KEY = {{ partner_auth_public_key_v2 }} DB_URL = {{ oracle_sbab_jdbcurl }} In this case you can already use MICROSERVICES_JWT_KEY , PARTNER_AUTH_V2_KEY and ORACLE_SBAB_JDBCURL variables without redefining them in the env.list file. Previous Next © Copyright 2024, TNT. Built with Sphinx using a theme provided by Read the Docs .
