@@ -8,8 +8,10 @@ import subprocess
 from langchain_community.llms import LlamaCpp
 from langchain.embeddings import LlamaCppEmbeddings
 
-MODEL_REPO = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
-MODEL_NAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+# MODEL_REPO = "TheBloke/Mistral-7B-Instruct-v0.1-GGUF"
+# MODEL_NAME = "mistral-7b-instruct-v0.1.Q4_K_M.gguf"
+MODEL_REPO = "TheBloke/Llama-2-7b-Chat-GGUF"
+MODEL_NAME = "llama-2-7b-chat.Q4_K_M.gguf"
 LOCAL_DIR = "/models"
 CHORMADB_PATH = 'chroma_db_data'
 CHORMADB_COLLECTION_NAME = 'web_pages'
